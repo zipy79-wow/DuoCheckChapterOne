@@ -1,0 +1,8 @@
+## Interface: 11503
+## Title: DuoCheck
+## Notes: Duo Dungeon Tracker
+## Author: Jules
+## Version: 1.0
+## SavedVariablesPerCharacter: DuoCheckDungeonsDB
+
+DuoCheck.lua
