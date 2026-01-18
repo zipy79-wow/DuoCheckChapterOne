@@ -1,4 +1,9 @@
 local addonName, addon = ...
+
+-- Lua globals
+local GetTime = GetTime
+local date = date
+
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
 addon.frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
