@@ -349,7 +349,7 @@ function addon:UpdateSummaryFrame()
         end
     end
 
-    -- Hide unused lines (fix bug)
+    -- Hide unused lines
     for i = count + 1, #summaryFrame.Lines do
         summaryFrame.Lines[i]:Hide()
     end
