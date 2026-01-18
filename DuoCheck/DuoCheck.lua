@@ -150,10 +150,15 @@ function addon:CreateProgressFrame()
     f.BossLines = {}
     f.StrikeLines = {} -- For strikethrough effect
 
+    local timeSinceLastUpdate = 0
     f:SetScript("OnUpdate", function(self, elapsed)
-        if currentRun and not currentRun.done then
-            local duration = GetTime() - currentRun.startTime
-            self.Timer:SetText(date("!%H:%M:%S", duration))
+        timeSinceLastUpdate = timeSinceLastUpdate + elapsed
+        if timeSinceLastUpdate >= 0.1 then
+            if currentRun and not currentRun.done then
+                local duration = GetTime() - currentRun.startTime
+                self.Timer:SetText(date("!%H:%M:%S", duration))
+            end
+            timeSinceLastUpdate = 0
         end
     end)
 
