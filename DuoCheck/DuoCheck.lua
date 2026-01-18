@@ -73,6 +73,8 @@ local DUNGEONS = {
     }
 }
 
+local DUNGEON_ORDER = {1417, 1413, 1414, 1415} -- DM, WC, SFK, BFD (Classic IDs)
+
 -- State
 local currentZoneID = nil
 local currentRun = nil
@@ -311,10 +313,9 @@ function addon:UpdateSummaryFrame()
 
     local yOffset = 0
     -- Iterate through dungeons in specific order
-    local order = {1417, 1413, 1414, 1415} -- DM, WC, SFK, BFD (Classic IDs)
     local count = 0
 
-    for _, zoneID in ipairs(order) do
+    for _, zoneID in ipairs(DUNGEON_ORDER) do
         local dungeon = DUNGEONS[zoneID]
         local record = DuoCheckDungeonsDB.completed[zoneID]
         count = count + 1
