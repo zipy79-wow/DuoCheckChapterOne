@@ -1,4 +1,11 @@
 local addonName, addon = ...
+
+-- Cache global functions for performance
+local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
+local strsub = strsub
+local ipairs = ipairs
+local time = time
+
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
 addon.frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
