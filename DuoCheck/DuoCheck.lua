@@ -5,6 +5,8 @@ local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
 local strsub = strsub
 local ipairs = ipairs
 local time = time
+local GetTime = GetTime
+local date = date
 
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
