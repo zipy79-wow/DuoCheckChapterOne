@@ -328,11 +328,14 @@ function addon:UpdateSummaryFrame()
         local line = summaryFrame.Lines[count]
         if not line then
             line = summaryFrame.Content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            line:SetJustifyH("LEFT")
-            line:SetPoint("TOPLEFT", 0, yOffset)
-            line:SetWidth(270)
             summaryFrame.Lines[count] = line
         end
+
+        line:ClearAllPoints()
+        line:SetFontObject("GameFontNormal")
+        line:SetJustifyH("LEFT")
+        line:SetPoint("TOPLEFT", 0, yOffset)
+        line:SetWidth(270)
 
         if record and record.done then
             line:SetText("|cff00ff00[x] " .. dungeon.name .. "|r")
@@ -347,11 +350,15 @@ function addon:UpdateSummaryFrame()
             local detailLine = summaryFrame.Lines[count]
             if not detailLine then
                 detailLine = summaryFrame.Content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-                detailLine:SetJustifyH("LEFT")
-                detailLine:SetPoint("TOPLEFT", 15, yOffset - 15)
-                 detailLine:SetWidth(255)
                 summaryFrame.Lines[count] = detailLine
             end
+
+            detailLine:ClearAllPoints()
+            detailLine:SetFontObject("GameFontHighlightSmall")
+            detailLine:SetJustifyH("LEFT")
+            detailLine:SetPoint("TOPLEFT", 15, yOffset - 15)
+            detailLine:SetWidth(255)
+
             local txt = string.format("Completed: %s | Time: %s | Lvl: %s | Mode: %s",
                 record.last.whenText, record.last.durationText, record.last.level, record.last.mode)
             detailLine:SetText(txt)
@@ -362,7 +369,7 @@ function addon:UpdateSummaryFrame()
         end
     end
 
-    -- Hide unused lines (fix bug)
+    -- Hide unused lines from the object pool
     for i = count + 1, #summaryFrame.Lines do
         summaryFrame.Lines[i]:Hide()
     end
