@@ -406,6 +406,14 @@ function addon:StartRun(zoneID)
     -- Check for persisted run first
     if DuoCheckDungeonsDB.currentRun and DuoCheckDungeonsDB.currentRun.zoneID == zoneID and not DuoCheckDungeonsDB.currentRun.done then
         currentRun = DuoCheckDungeonsDB.currentRun
+
+        -- Fix time offset for session persistence
+        if currentRun.startTimeEpoch then
+             -- Re-calculate local startTime relative to now using epoch time
+             local elapsed = time() - currentRun.startTimeEpoch
+             currentRun.startTime = GetTime() - elapsed
+        else
+            -- Legacy data without epoch start time, reset timer to now
         -- Fix time offset from session reload.
         -- GetTime() is session-relative and resets on login, making stored 'startTime' invalid.
         -- We use 'startTimeEpoch' (Unix timestamp) to calculate total elapsed time, then
