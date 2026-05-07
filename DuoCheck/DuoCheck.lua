@@ -5,6 +5,8 @@ local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
 local strsub = strsub
 local ipairs = ipairs
 local time = time
+local GetTime = GetTime
+local date = date
 
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
@@ -78,6 +80,11 @@ for _, dungeon in pairs(DUNGEONS) do
     dungeon.bossLookup = {}
     for _, bossName in ipairs(dungeon.bosses) do
         dungeon.bossLookup[bossName] = true
+-- Generate bossLookup dynamically for O(1) checks
+for _, dungeon in pairs(DUNGEONS) do
+    dungeon.bossLookup = {}
+    for _, boss in ipairs(dungeon.bosses) do
+        dungeon.bossLookup[boss] = true
     end
 end
 
@@ -370,7 +377,7 @@ function addon:UpdateSummaryFrame()
         end
     end
 
-    -- Hide unused lines (fix bug)
+    -- Hide unused lines
     for i = count + 1, #summaryFrame.Lines do
         summaryFrame.Lines[i]:Hide()
     end
