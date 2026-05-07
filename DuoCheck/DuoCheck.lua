@@ -484,16 +484,21 @@ function addon:OnCombatLog()
 
             -- Check if Boss
             local dungeon = DUNGEONS[currentRun.zoneID]
+            local isBossKill = false
             for _, bossName in ipairs(dungeon.bosses) do
                 if destName == bossName and not currentRun.bossesKilled[bossName] then
                     currentRun.bossesKilled[bossName] = time()
                     addon:AnnounceBossKill(bossName)
+                    isBossKill = true
+                    break -- Can stop checking bosses if one matched
                 end
             end
 
-            addon:CheckCompletion()
-            addon:UpdateProgressFrame()
-            addon:SaveRunState() -- Save after updates
+            if isBossKill then
+                addon:CheckCompletion()
+                addon:UpdateProgressFrame()
+                addon:SaveRunState() -- Save after updates
+            end
         end
     end
 end
