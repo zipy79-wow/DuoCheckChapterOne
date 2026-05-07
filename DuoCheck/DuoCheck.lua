@@ -197,6 +197,11 @@ function addon:CreateProgressFrame()
     progressFrame = f
 end
 
+function addon:UpdateMobCount()
+    if not progressFrame or not currentRun then return end
+    progressFrame.Mobs:SetText("Mobs Killed: " .. currentRun.mobCount)
+end
+
 function addon:UpdateProgressFrame()
     if not progressFrame or not currentRun then return end
 
@@ -495,13 +500,24 @@ function addon:OnCombatLog()
 
             -- Check if Boss
             local dungeon = DUNGEONS[currentRun.zoneID]
+            local bossKilled = false
+            for _, bossName in ipairs(dungeon.bosses) do
+                if destName == bossName and not currentRun.bossesKilled[bossName] then
+                    currentRun.bossesKilled[bossName] = time()
+                    addon:AnnounceBossKill(bossName)
+                    bossKilled = true
+                end
             if destName and dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
                 currentRun.bossesKilled[destName] = time()
                 addon:AnnounceBossKill(destName)
             end
 
-            addon:CheckCompletion()
-            addon:UpdateProgressFrame()
+            if bossKilled then
+                addon:CheckCompletion()
+                addon:UpdateProgressFrame()
+            else
+                addon:UpdateMobCount()
+            end
             addon:SaveRunState() -- Save after updates
         end
     end
