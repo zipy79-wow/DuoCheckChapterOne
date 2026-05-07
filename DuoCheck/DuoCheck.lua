@@ -6,6 +6,7 @@ local strsub = strsub
 local ipairs = ipairs
 local time = time
 local GetTime = GetTime
+local math_abs = math.abs
 local date = date
 
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
@@ -419,7 +420,11 @@ function addon:StartRun(zoneID)
         if currentRun.startTimeEpoch then
              -- Re-calculate local startTime relative to now using epoch time
              local elapsed = time() - currentRun.startTimeEpoch
-             currentRun.startTime = GetTime() - elapsed
+             local expectedStartTime = GetTime() - elapsed
+
+             if not currentRun.startTime or math_abs(currentRun.startTime - expectedStartTime) > 2 then
+                 currentRun.startTime = expectedStartTime
+             end
         else
             -- Legacy data without epoch start time, reset timer to now
         -- Fix time offset from session reload.
