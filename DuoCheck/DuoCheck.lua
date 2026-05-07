@@ -6,6 +6,9 @@ local strsub = strsub
 local ipairs = ipairs
 local time = time
 local GetTime = GetTime
+local date = date
+local math_abs = math.abs
+local math_floor = math.floor
 local math_abs = math.abs
 local date = date
 
@@ -421,6 +424,16 @@ function addon:StartRun(zoneID)
     if DuoCheckDungeonsDB.currentRun and DuoCheckDungeonsDB.currentRun.zoneID == zoneID and not DuoCheckDungeonsDB.currentRun.done then
         currentRun = DuoCheckDungeonsDB.currentRun
 
+        -- Restore timer precision by checking session drift
+
+        if currentRun.startTimeEpoch and currentRun.startTime then
+             local elapsedEpoch = time() - currentRun.startTimeEpoch
+             local elapsedGetTime = GetTime() - currentRun.startTime
+
+             if math_abs(elapsedEpoch - elapsedGetTime) > 2 or elapsedGetTime < 0 then
+                 currentRun.startTime = GetTime() - elapsedEpoch
+             end
+        elseif currentRun.startTimeEpoch then
         -- Fix time offset for session persistence
         if currentRun.startTimeEpoch then
              -- Re-calculate local startTime relative to now using epoch time
