@@ -75,6 +75,11 @@ local DUNGEONS = {
     }
 }
 
+-- Preprocess Boss Lookup Tables
+for _, dungeon in pairs(DUNGEONS) do
+    dungeon.bossLookup = {}
+    for _, bossName in ipairs(dungeon.bosses) do
+        dungeon.bossLookup[bossName] = true
 -- Generate bossLookup dynamically for O(1) checks
 for _, dungeon in pairs(DUNGEONS) do
     dungeon.bossLookup = {}
