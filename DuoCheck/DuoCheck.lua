@@ -393,27 +393,15 @@ function addon:StartRun(zoneID)
     -- Check for persisted run first
     if DuoCheckDungeonsDB.currentRun and DuoCheckDungeonsDB.currentRun.zoneID == zoneID and not DuoCheckDungeonsDB.currentRun.done then
         currentRun = DuoCheckDungeonsDB.currentRun
-        -- Fix time offset if needed? Using GetTime() which is session relative.
-        -- If session changed (reload), GetTime() resets. We need to handle that.
-        -- Actually, GetTime() resets on login. So 'startTime' from previous session is invalid.
-        -- We need to store 'startTime' as epoch time for persistence or calculate elapsed.
-        -- For simplicity, if we restore, we might reset the timer display or approximate it.
-        -- Let's adjust: currentRun.startTime needs to be relative to current GetTime().
-        -- We can store 'accumulatedTime' or 'startTimeEpoch'.
-        -- Let's update StartRun to use epoch for start time logic if we want real persistence across sessions.
-        -- But for reload, we can just assume user wants to continue.
-        -- To fix timer after reload:
-        -- Store 'startTime' as time() (epoch).
-        -- Then duration = time() - startTime.
-        -- But GetTime() is high precision for short durations.
-        -- Let's stick to simple reload logic: If persisted run exists, we use it, but fix startTime.
-
+        -- Fix time offset from session reload.
+        -- GetTime() is session-relative and resets on login, making stored 'startTime' invalid.
+        -- We use 'startTimeEpoch' (Unix timestamp) to calculate total elapsed time, then
+        -- back-calculate a new local 'startTime' relative to the current session's GetTime().
         if currentRun.startTimeEpoch then
-             -- Re-calculate local startTime relative to now
              local elapsed = time() - currentRun.startTimeEpoch
              currentRun.startTime = GetTime() - elapsed
         else
-            -- Legacy or fresh
+            -- Legacy or fresh fallback
             currentRun.startTime = GetTime()
             currentRun.startTimeEpoch = time()
         end
