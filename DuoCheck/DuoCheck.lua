@@ -5,6 +5,8 @@ local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
 local strsub = strsub
 local ipairs = ipairs
 local time = time
+local GetTime = GetTime
+local date = date
 
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
@@ -73,7 +75,28 @@ local DUNGEONS = {
     }
 }
 
+-- Preprocess Boss Lookup Tables
+for _, dungeon in pairs(DUNGEONS) do
+    dungeon.bossLookup = {}
+    for _, bossName in ipairs(dungeon.bosses) do
+        dungeon.bossLookup[bossName] = true
+-- Generate bossLookup dynamically for O(1) checks
+for _, dungeon in pairs(DUNGEONS) do
+    dungeon.bossLookup = {}
+    for _, boss in ipairs(dungeon.bosses) do
+        dungeon.bossLookup[boss] = true
+    end
+end
+
 local DUNGEON_ORDER = {1417, 1413, 1414, 1415} -- DM, WC, SFK, BFD (Classic IDs)
+
+-- Pre-generate lookup tables for optimized boss checking
+for _, dungeon in pairs(DUNGEONS) do
+    dungeon.bossLookup = {}
+    for _, bossName in ipairs(dungeon.bosses) do
+        dungeon.bossLookup[bossName] = true
+    end
+end
 
 -- State
 local currentZoneID = nil
@@ -172,6 +195,11 @@ function addon:CreateProgressFrame()
     end)
 
     progressFrame = f
+end
+
+function addon:UpdateMobCount()
+    if not progressFrame or not currentRun then return end
+    progressFrame.Mobs:SetText("Mobs Killed: " .. currentRun.mobCount)
 end
 
 function addon:UpdateProgressFrame()
@@ -370,6 +398,7 @@ function addon:UpdateSummaryFrame()
     end
 
     -- Hide unused lines from the object pool
+    -- Hide unused lines
     for i = count + 1, #summaryFrame.Lines do
         summaryFrame.Lines[i]:Hide()
     end
@@ -385,27 +414,23 @@ function addon:StartRun(zoneID)
     -- Check for persisted run first
     if DuoCheckDungeonsDB.currentRun and DuoCheckDungeonsDB.currentRun.zoneID == zoneID and not DuoCheckDungeonsDB.currentRun.done then
         currentRun = DuoCheckDungeonsDB.currentRun
-        -- Fix time offset if needed? Using GetTime() which is session relative.
-        -- If session changed (reload), GetTime() resets. We need to handle that.
-        -- Actually, GetTime() resets on login. So 'startTime' from previous session is invalid.
-        -- We need to store 'startTime' as epoch time for persistence or calculate elapsed.
-        -- For simplicity, if we restore, we might reset the timer display or approximate it.
-        -- Let's adjust: currentRun.startTime needs to be relative to current GetTime().
-        -- We can store 'accumulatedTime' or 'startTimeEpoch'.
-        -- Let's update StartRun to use epoch for start time logic if we want real persistence across sessions.
-        -- But for reload, we can just assume user wants to continue.
-        -- To fix timer after reload:
-        -- Store 'startTime' as time() (epoch).
-        -- Then duration = time() - startTime.
-        -- But GetTime() is high precision for short durations.
-        -- Let's stick to simple reload logic: If persisted run exists, we use it, but fix startTime.
 
+        -- Fix time offset for session persistence
         if currentRun.startTimeEpoch then
-             -- Re-calculate local startTime relative to now
+             -- Re-calculate local startTime relative to now using epoch time
              local elapsed = time() - currentRun.startTimeEpoch
              currentRun.startTime = GetTime() - elapsed
         else
-            -- Legacy or fresh
+            -- Legacy data without epoch start time, reset timer to now
+        -- Fix time offset from session reload.
+        -- GetTime() is session-relative and resets on login, making stored 'startTime' invalid.
+        -- We use 'startTimeEpoch' (Unix timestamp) to calculate total elapsed time, then
+        -- back-calculate a new local 'startTime' relative to the current session's GetTime().
+        if currentRun.startTimeEpoch then
+             local elapsed = time() - currentRun.startTimeEpoch
+             currentRun.startTime = GetTime() - elapsed
+        else
+            -- Legacy or fresh fallback
             currentRun.startTime = GetTime()
             currentRun.startTimeEpoch = time()
         end
@@ -491,15 +516,24 @@ function addon:OnCombatLog()
 
             -- Check if Boss
             local dungeon = DUNGEONS[currentRun.zoneID]
+            local bossKilled = false
             for _, bossName in ipairs(dungeon.bosses) do
                 if destName == bossName and not currentRun.bossesKilled[bossName] then
                     currentRun.bossesKilled[bossName] = time()
                     addon:AnnounceBossKill(bossName)
+                    bossKilled = true
                 end
+            if destName and dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
+                currentRun.bossesKilled[destName] = time()
+                addon:AnnounceBossKill(destName)
             end
 
-            addon:CheckCompletion()
-            addon:UpdateProgressFrame()
+            if bossKilled then
+                addon:CheckCompletion()
+                addon:UpdateProgressFrame()
+            else
+                addon:UpdateMobCount()
+            end
             addon:SaveRunState() -- Save after updates
         end
     end
