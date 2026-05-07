@@ -209,7 +209,7 @@ function addon:UpdateProgressFrame()
     local dungeon = DUNGEONS[currentRun.zoneID]
     progressFrame.Title:SetText(dungeon.name)
     progressFrame.Info:SetText(currentRun.mode .. " - Lvl " .. currentRun.startLevel .. " (Cap " .. dungeon.cap .. ")")
-    progressFrame.Mobs:SetText("Mobs Killed: " .. currentRun.mobCount)
+    addon:UpdateMobCount()
 
     -- Update Boss List
     local yOffset = 0
@@ -260,6 +260,11 @@ function addon:UpdateProgressFrame()
 
     -- Adjust height
     progressFrame:SetHeight(100 + (#dungeon.bosses * 15) + 20)
+end
+
+function addon:UpdateMobCount()
+    if not progressFrame or not currentRun then return end
+    progressFrame.Mobs:SetText("Mobs Killed: " .. currentRun.mobCount)
 end
 
 -- UI - Summary Frame
@@ -521,6 +526,14 @@ function addon:OnCombatLog()
 
             -- Check if Boss
             local dungeon = DUNGEONS[currentRun.zoneID]
+            local isBoss = false
+            for _, bossName in ipairs(dungeon.bosses) do
+                if destName == bossName then
+                    isBoss = true
+                    if not currentRun.bossesKilled[bossName] then
+                        currentRun.bossesKilled[bossName] = time()
+                        addon:AnnounceBossKill(bossName)
+                    end
             local bossKilled = false
             for _, bossName in ipairs(dungeon.bosses) do
                 if destName == bossName and not currentRun.bossesKilled[bossName] then
@@ -533,6 +546,7 @@ function addon:OnCombatLog()
                 addon:AnnounceBossKill(destName)
             end
 
+            if isBoss then
             if bossKilled then
                 addon:CheckCompletion()
                 addon:UpdateProgressFrame()
