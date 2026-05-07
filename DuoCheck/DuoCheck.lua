@@ -73,6 +73,14 @@ local DUNGEONS = {
     }
 }
 
+-- Generate bossLookup dynamically for O(1) checks
+for _, dungeon in pairs(DUNGEONS) do
+    dungeon.bossLookup = {}
+    for _, boss in ipairs(dungeon.bosses) do
+        dungeon.bossLookup[boss] = true
+    end
+end
+
 local DUNGEON_ORDER = {1417, 1413, 1414, 1415} -- DM, WC, SFK, BFD (Classic IDs)
 
 -- State
@@ -484,11 +492,9 @@ function addon:OnCombatLog()
 
             -- Check if Boss
             local dungeon = DUNGEONS[currentRun.zoneID]
-            for _, bossName in ipairs(dungeon.bosses) do
-                if destName == bossName and not currentRun.bossesKilled[bossName] then
-                    currentRun.bossesKilled[bossName] = time()
-                    addon:AnnounceBossKill(bossName)
-                end
+            if destName and dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
+                currentRun.bossesKilled[destName] = time()
+                addon:AnnounceBossKill(destName)
             end
 
             addon:CheckCompletion()
