@@ -5,6 +5,9 @@ local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
 local strsub = strsub
 local ipairs = ipairs
 local time = time
+local GetTime = GetTime
+local math_abs = math.abs
+local date = date
 
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
@@ -73,7 +76,28 @@ local DUNGEONS = {
     }
 }
 
+-- Preprocess Boss Lookup Tables
+for _, dungeon in pairs(DUNGEONS) do
+    dungeon.bossLookup = {}
+    for _, bossName in ipairs(dungeon.bosses) do
+        dungeon.bossLookup[bossName] = true
+-- Generate bossLookup dynamically for O(1) checks
+for _, dungeon in pairs(DUNGEONS) do
+    dungeon.bossLookup = {}
+    for _, boss in ipairs(dungeon.bosses) do
+        dungeon.bossLookup[boss] = true
+    end
+end
+
 local DUNGEON_ORDER = {1417, 1413, 1414, 1415} -- DM, WC, SFK, BFD (Classic IDs)
+
+-- Pre-generate lookup tables for optimized boss checking
+for _, dungeon in pairs(DUNGEONS) do
+    dungeon.bossLookup = {}
+    for _, bossName in ipairs(dungeon.bosses) do
+        dungeon.bossLookup[bossName] = true
+    end
+end
 
 -- State
 local currentZoneID = nil
@@ -174,13 +198,18 @@ function addon:CreateProgressFrame()
     progressFrame = f
 end
 
+function addon:UpdateMobCount()
+    if not progressFrame or not currentRun then return end
+    progressFrame.Mobs:SetText("Mobs Killed: " .. currentRun.mobCount)
+end
+
 function addon:UpdateProgressFrame()
     if not progressFrame or not currentRun then return end
 
     local dungeon = DUNGEONS[currentRun.zoneID]
     progressFrame.Title:SetText(dungeon.name)
     progressFrame.Info:SetText(currentRun.mode .. " - Lvl " .. currentRun.startLevel .. " (Cap " .. dungeon.cap .. ")")
-    progressFrame.Mobs:SetText("Mobs Killed: " .. currentRun.mobCount)
+    addon:UpdateMobCount()
 
     -- Update Boss List
     local yOffset = 0
@@ -231,6 +260,11 @@ function addon:UpdateProgressFrame()
 
     -- Adjust height
     progressFrame:SetHeight(100 + (#dungeon.bosses * 15) + 20)
+end
+
+function addon:UpdateMobCount()
+    if not progressFrame or not currentRun then return end
+    progressFrame.Mobs:SetText("Mobs Killed: " .. currentRun.mobCount)
 end
 
 -- UI - Summary Frame
@@ -328,11 +362,14 @@ function addon:UpdateSummaryFrame()
         local line = summaryFrame.Lines[count]
         if not line then
             line = summaryFrame.Content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            line:SetJustifyH("LEFT")
-            line:SetPoint("TOPLEFT", 0, yOffset)
-            line:SetWidth(270)
             summaryFrame.Lines[count] = line
         end
+
+        line:ClearAllPoints()
+        line:SetFontObject("GameFontNormal")
+        line:SetJustifyH("LEFT")
+        line:SetPoint("TOPLEFT", 0, yOffset)
+        line:SetWidth(270)
 
         if record and record.done then
             line:SetText("|cff00ff00[x] " .. dungeon.name .. "|r")
@@ -347,11 +384,15 @@ function addon:UpdateSummaryFrame()
             local detailLine = summaryFrame.Lines[count]
             if not detailLine then
                 detailLine = summaryFrame.Content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-                detailLine:SetJustifyH("LEFT")
-                detailLine:SetPoint("TOPLEFT", 15, yOffset - 15)
-                 detailLine:SetWidth(255)
                 summaryFrame.Lines[count] = detailLine
             end
+
+            detailLine:ClearAllPoints()
+            detailLine:SetFontObject("GameFontHighlightSmall")
+            detailLine:SetJustifyH("LEFT")
+            detailLine:SetPoint("TOPLEFT", 15, yOffset - 15)
+            detailLine:SetWidth(255)
+
             local txt = string.format("Completed: %s | Time: %s | Lvl: %s | Mode: %s",
                 record.last.whenText, record.last.durationText, record.last.level, record.last.mode)
             detailLine:SetText(txt)
@@ -362,7 +403,8 @@ function addon:UpdateSummaryFrame()
         end
     end
 
-    -- Hide unused lines (fix bug)
+    -- Hide unused lines from the object pool
+    -- Hide unused lines
     for i = count + 1, #summaryFrame.Lines do
         summaryFrame.Lines[i]:Hide()
     end
@@ -378,27 +420,27 @@ function addon:StartRun(zoneID)
     -- Check for persisted run first
     if DuoCheckDungeonsDB.currentRun and DuoCheckDungeonsDB.currentRun.zoneID == zoneID and not DuoCheckDungeonsDB.currentRun.done then
         currentRun = DuoCheckDungeonsDB.currentRun
-        -- Fix time offset if needed? Using GetTime() which is session relative.
-        -- If session changed (reload), GetTime() resets. We need to handle that.
-        -- Actually, GetTime() resets on login. So 'startTime' from previous session is invalid.
-        -- We need to store 'startTime' as epoch time for persistence or calculate elapsed.
-        -- For simplicity, if we restore, we might reset the timer display or approximate it.
-        -- Let's adjust: currentRun.startTime needs to be relative to current GetTime().
-        -- We can store 'accumulatedTime' or 'startTimeEpoch'.
-        -- Let's update StartRun to use epoch for start time logic if we want real persistence across sessions.
-        -- But for reload, we can just assume user wants to continue.
-        -- To fix timer after reload:
-        -- Store 'startTime' as time() (epoch).
-        -- Then duration = time() - startTime.
-        -- But GetTime() is high precision for short durations.
-        -- Let's stick to simple reload logic: If persisted run exists, we use it, but fix startTime.
 
+        -- Fix time offset for session persistence
         if currentRun.startTimeEpoch then
-             -- Re-calculate local startTime relative to now
+             -- Re-calculate local startTime relative to now using epoch time
+             local elapsed = time() - currentRun.startTimeEpoch
+             local expectedStartTime = GetTime() - elapsed
+
+             if not currentRun.startTime or math_abs(currentRun.startTime - expectedStartTime) > 2 then
+                 currentRun.startTime = expectedStartTime
+             end
+        else
+            -- Legacy data without epoch start time, reset timer to now
+        -- Fix time offset from session reload.
+        -- GetTime() is session-relative and resets on login, making stored 'startTime' invalid.
+        -- We use 'startTimeEpoch' (Unix timestamp) to calculate total elapsed time, then
+        -- back-calculate a new local 'startTime' relative to the current session's GetTime().
+        if currentRun.startTimeEpoch then
              local elapsed = time() - currentRun.startTimeEpoch
              currentRun.startTime = GetTime() - elapsed
         else
-            -- Legacy or fresh
+            -- Legacy or fresh fallback
             currentRun.startTime = GetTime()
             currentRun.startTimeEpoch = time()
         end
@@ -485,13 +527,26 @@ function addon:OnCombatLog()
             -- Check if Boss
             local dungeon = DUNGEONS[currentRun.zoneID]
             local isBossKill = false
+            local isBoss = false
+            for _, bossName in ipairs(dungeon.bosses) do
+                if destName == bossName then
+                    isBoss = true
+                    if not currentRun.bossesKilled[bossName] then
+                        currentRun.bossesKilled[bossName] = time()
+                        addon:AnnounceBossKill(bossName)
+                    end
+            local bossKilled = false
             for _, bossName in ipairs(dungeon.bosses) do
                 if destName == bossName and not currentRun.bossesKilled[bossName] then
                     currentRun.bossesKilled[bossName] = time()
                     addon:AnnounceBossKill(bossName)
                     isBossKill = true
                     break -- Can stop checking bosses if one matched
+                    bossKilled = true
                 end
+            if destName and dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
+                currentRun.bossesKilled[destName] = time()
+                addon:AnnounceBossKill(destName)
             end
 
             if isBossKill then
@@ -499,6 +554,14 @@ function addon:OnCombatLog()
                 addon:UpdateProgressFrame()
                 addon:SaveRunState() -- Save after updates
             end
+            if isBoss then
+            if bossKilled then
+                addon:CheckCompletion()
+                addon:UpdateProgressFrame()
+            else
+                addon:UpdateMobCount()
+            end
+            addon:SaveRunState() -- Save after updates
         end
     end
 end
