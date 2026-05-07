@@ -90,6 +90,14 @@ end
 
 local DUNGEON_ORDER = {1417, 1413, 1414, 1415} -- DM, WC, SFK, BFD (Classic IDs)
 
+-- Pre-generate lookup tables for optimized boss checking
+for _, dungeon in pairs(DUNGEONS) do
+    dungeon.bossLookup = {}
+    for _, bossName in ipairs(dungeon.bosses) do
+        dungeon.bossLookup[bossName] = true
+    end
+end
+
 -- State
 local currentZoneID = nil
 local currentRun = nil
