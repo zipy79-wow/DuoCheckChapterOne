@@ -116,14 +116,6 @@ local DUNGEONS = {
 }
 
 -- Preprocess Boss Lookup Tables
--- Generate bossLookup dynamically for O(1) checks
-for _, dungeon in pairs(DUNGEONS) do
-    dungeon.bossLookup = {}
-    for _, bossName in ipairs(dungeon.bosses) do
-        dungeon.bossLookup[bossName] = true
-    end
-end
-
 local DUNGEON_ORDER = {1417, 1413, 1414, 1415} -- DM, WC, SFK, BFD (Classic IDs)
 
 -- State
@@ -560,23 +552,20 @@ function addon:OnCombatLog()
                 currentRun.bossesKilled[destName] = time()
                 currentRun.bossesRemaining = currentRun.bossesRemaining - 1
             local dungeon = DUNGEONS[currentRun.zoneID]
-            local isBossKill = false
-
-            if destName and dungeon.bossLookup[destName] then
-                if not currentRun.bossesKilled[destName] then
-                    currentRun.bossesKilled[destName] = time()
-                    addon:AnnounceBossKill(destName)
-                    isBossKill = true
-                end
+            local bossKilled = false
+            if destName and dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
+                currentRun.bossesKilled[destName] = time()
+                addon:AnnounceBossKill(destName)
+                bossKilled = true
             end
 
-            if isBossKill then
+            if bossKilled then
                 addon:CheckCompletion()
                 addon:UpdateProgressFrame()
+                addon:SaveRunState() -- Save after updates
             else
                 addon:UpdateMobCount()
             end
-            addon:SaveRunState()
         end
     end
 end
