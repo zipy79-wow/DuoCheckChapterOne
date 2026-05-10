@@ -545,6 +545,7 @@ function addon:StartRun(zoneID)
         end
 
         Print("Restored run for " .. dungeon.name)
+        if progressFrame then progressFrame.lastSecond = -1 end
     else
         currentRun = {
             zoneID = zoneID,
@@ -558,6 +559,7 @@ function addon:StartRun(zoneID)
             done = false
         }
         Print("Started tracking: " .. dungeon.name .. " (" .. mode .. ")")
+        if progressFrame then progressFrame.lastSecond = -1 end
     end
 
     addon:SaveRunState()
