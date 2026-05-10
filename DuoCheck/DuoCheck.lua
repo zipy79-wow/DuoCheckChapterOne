@@ -35,6 +35,15 @@ local DUNGEONS = {
             "Cookie",
             "Captain Greenskin",
             "Edwin VanCleef"
+        },
+        bossLookup = {
+            ["Rhahk'Zor"] = true,
+            ["Sneed"] = true,
+            ["Gilnid"] = true,
+            ["Mr. Smite"] = true,
+            ["Cookie"] = true,
+            ["Captain Greenskin"] = true,
+            ["Edwin VanCleef"] = true
         }
     },
     [1413] = { -- Wailing Caverns (Classic Map ID: 1413)
@@ -49,6 +58,16 @@ local DUNGEONS = {
             "Lord Serpentis",
             "Verdan the Everliving",
             "Mutanus the Devourer"
+        },
+        bossLookup = {
+            ["Lady Anacondra"] = true,
+            ["Lord Cobrahn"] = true,
+            ["Kresh"] = true,
+            ["Lord Pythas"] = true,
+            ["Skum"] = true,
+            ["Lord Serpentis"] = true,
+            ["Verdan the Everliving"] = true,
+            ["Mutanus the Devourer"] = true
         }
     },
     [1414] = { -- Shadowfang Keep (Classic Map ID: 1414)
@@ -63,6 +82,16 @@ local DUNGEONS = {
             "Fenrus the Devourer",
             "Wolf Master Nandos",
             "Archmage Arugal"
+        },
+        bossLookup = {
+            ["Rethilgore"] = true,
+            ["Razorclaw the Butcher"] = true,
+            ["Baron Silverlaine"] = true,
+            ["Commander Springvale"] = true,
+            ["Odo the Watcher"] = true,
+            ["Fenrus the Devourer"] = true,
+            ["Wolf Master Nandos"] = true,
+            ["Archmage Arugal"] = true
         }
     },
     [1415] = { -- Blackfathom Deeps (Classic Map ID: 1415)
@@ -76,6 +105,15 @@ local DUNGEONS = {
             "Lorgus Jett",
             "Twilight Lord Kelris",
             "Aku'mai"
+        },
+        bossLookup = {
+            ["Ghamoo-ra"] = true,
+            ["Lady Sarevess"] = true,
+            ["Gelihast"] = true,
+            ["Baron Aquanis"] = true,
+            ["Lorgus Jett"] = true,
+            ["Twilight Lord Kelris"] = true,
+            ["Aku'mai"] = true
         }
     }
 }
@@ -443,6 +481,11 @@ function addon:StartRun(zoneID)
             currentRun.startTimeEpoch = time()
         end
 
+        -- Recalculate bossesRemaining if missing (legacy restoration)
+        if not currentRun.bossesRemaining then
+            local remaining = 0
+            for _, boss in ipairs(dungeon.bosses) do
+                if not currentRun.bossesKilled[boss] then
         -- Initialize/Recalculate bossesRemaining for restoration
         if not currentRun.bossesRemaining then
             local remaining = 0
@@ -467,10 +510,6 @@ function addon:StartRun(zoneID)
             mobCount = 0,
             done = false
         }
-        -- Initialize bossesKilled
-        for _, boss in ipairs(dungeon.bosses) do
-            currentRun.bossesKilled[boss] = false
-        end
         Print("Started tracking: " .. dungeon.name .. " (" .. mode .. ")")
     end
 
@@ -534,6 +573,11 @@ function addon:OnCombatLog()
         if destGUID and (strsub(destGUID, 1, 8) == "Creature" or strsub(destGUID, 1, 7) == "Vehicle") then
             currentRun.mobCount = currentRun.mobCount + 1
 
+            -- Check if Boss - O(1) lookup using static data
+            local dungeon = DUNGEONS[currentRun.zoneID]
+            if destName and dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
+                currentRun.bossesKilled[destName] = time()
+                currentRun.bossesRemaining = currentRun.bossesRemaining - 1
             -- Check if Boss
             if destName and currentRun.bossesKilled[destName] == false then
                 currentRun.bossesKilled[destName] = time()
@@ -588,6 +632,8 @@ end
 function addon:CheckCompletion()
     if not currentRun or currentRun.done then return end
 
+    if currentRun.bossesRemaining == 0 then
+        local dungeon = DUNGEONS[currentRun.zoneID]
     local dungeon = DUNGEONS[currentRun.zoneID]
     if currentRun.bossesRemaining == 0 then
         local currentLevel = UnitLevel("player")
