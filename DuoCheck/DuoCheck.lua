@@ -7,6 +7,7 @@ local ipairs = ipairs
 local time = time
 local GetTime = GetTime
 local date = date
+local floor = math.floor
 local math = math
 local math_abs = math.abs
 local math_floor = math.floor
@@ -232,6 +233,7 @@ function addon:CreateProgressFrame()
         if timeSinceLastUpdate >= 1.0 then
             if currentRun and not currentRun.done then
                 local duration = GetTime() - currentRun.startTime
+                local seconds = floor(duration)
                 local seconds = math.floor(duration)
                 if seconds ~= lastSecond then
                     self.Timer:SetText(date("!%H:%M:%S", duration))
