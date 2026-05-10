@@ -122,16 +122,11 @@ local DUNGEONS = {
     }
 }
 
--- Preprocess Boss Lookup Tables
+-- Initialize bossLookup tables for each dungeon
 for _, dungeon in pairs(DUNGEONS) do
     dungeon.bossLookup = {}
     for _, bossName in ipairs(dungeon.bosses) do
         dungeon.bossLookup[bossName] = true
--- Generate bossLookup dynamically for O(1) checks
-for _, dungeon in pairs(DUNGEONS) do
-    dungeon.bossLookup = {}
-    for _, boss in ipairs(dungeon.bosses) do
-        dungeon.bossLookup[boss] = true
     end
 end
 
@@ -551,29 +546,11 @@ function addon:StartRun(zoneID)
             currentRun.startTimeEpoch = time()
         end
 
-        -- Re-calculate bossesRemaining for restored runs if missing or needed
-        local remaining = 0
-        for _, bossName in ipairs(dungeon.bosses) do
-            if not currentRun.bossesKilled[bossName] then
-                remaining = remaining + 1
-            end
-        end
-        currentRun.bossesRemaining = remaining
-        -- Recalculate bossesRemaining if missing (legacy)
-        if not currentRun.bossesRemaining then
-            local remaining = 0
-            for _, bossName in ipairs(dungeon.bosses) do
-                if not currentRun.bossesKilled[bossName] then
-        -- Recalculate bossesRemaining if missing (legacy restoration)
+        -- Handle legacy run restoration for bossesRemaining
         if not currentRun.bossesRemaining then
             local remaining = 0
             for _, boss in ipairs(dungeon.bosses) do
                 if not currentRun.bossesKilled[boss] then
-        -- Initialize/Recalculate bossesRemaining for restoration
-        if not currentRun.bossesRemaining then
-            local remaining = 0
-            for _, bossName in ipairs(dungeon.bosses) do
-                if currentRun.bossesKilled[bossName] == false then
                     remaining = remaining + 1
                 end
             end
@@ -664,60 +641,14 @@ function addon:OnCombatLog()
                 currentRun.bossesKilled[destName] = time()
                 currentRun.bossesRemaining = currentRun.bossesRemaining - 1
             local dungeon = DUNGEONS[currentRun.zoneID]
-            if dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
-                currentRun.bossesKilled[destName] = time()
-                currentRun.bossesRemaining = currentRun.bossesRemaining - 1
-                addon:AnnounceBossKill(destName)
-
-                addon:CheckCompletion()
-                addon:UpdateProgressFrame()
-                addon:SaveRunState() -- Save after updates
-            else
-                -- Trash mob killed: minimize overhead
-                if progressFrame and progressFrame:IsShown() then
-                    progressFrame.Mobs:SetText("Mobs Killed: " .. currentRun.mobCount)
-                end
-
-                -- Throttle database saves for trash
-                if currentRun.mobCount % 10 == 0 then
-                    addon:SaveRunState()
-                end
-            end
-            local isBossKill = false
-            local isBoss = false
-            for _, bossName in ipairs(dungeon.bosses) do
-                if destName == bossName then
-                    isBoss = true
-                    if not currentRun.bossesKilled[bossName] then
-                        currentRun.bossesKilled[bossName] = time()
-                        addon:AnnounceBossKill(bossName)
-                    end
-            local bossKilled = false
-            for _, bossName in ipairs(dungeon.bosses) do
-                if destName == bossName and not currentRun.bossesKilled[bossName] then
-                    currentRun.bossesKilled[bossName] = time()
-                    addon:AnnounceBossKill(bossName)
-                    isBossKill = true
-                    break -- Can stop checking bosses if one matched
-                    bossKilled = true
-                end
             if destName and dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
                 currentRun.bossesKilled[destName] = time()
+                currentRun.bossesRemaining = (currentRun.bossesRemaining or 1) - 1
                 addon:AnnounceBossKill(destName)
+                addon:CheckCompletion()
             end
 
-            if isBossKill then
-                addon:CheckCompletion()
-                addon:UpdateProgressFrame()
-                addon:SaveRunState() -- Save after updates
-            end
-            if isBoss then
-            if bossKilled then
-                addon:CheckCompletion()
-                addon:UpdateProgressFrame()
-            else
-                addon:UpdateMobCount()
-            end
+            addon:UpdateProgressFrame()
             addon:SaveRunState() -- Save after updates
         end
     end
