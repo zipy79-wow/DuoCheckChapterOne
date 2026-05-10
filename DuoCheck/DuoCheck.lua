@@ -238,6 +238,10 @@ function addon:CreateProgressFrame()
         if timeSinceLastUpdate >= 1.0 then
             if currentRun and not currentRun.done then
                 local duration = GetTime() - currentRun.startTime
+                local currentSecond = floor(duration)
+                if currentSecond ~= lastSecond then
+                    self.Timer:SetText(date("!%H:%M:%S", duration))
+                    lastSecond = currentSecond
                 local currentSecond = math_floor(duration)
                 if currentSecond ~= self.lastSecond then
                     self.Timer:SetText(date("!%H:%M:%S", duration))
@@ -485,6 +489,14 @@ function addon:StartRun(zoneID)
     if DuoCheckDungeonsDB.currentRun and DuoCheckDungeonsDB.currentRun.zoneID == zoneID and not DuoCheckDungeonsDB.currentRun.done then
         currentRun = DuoCheckDungeonsDB.currentRun
 
+        -- To ensure timer persistence across game sessions, we use 'startTimeEpoch'.
+        -- Upon restoration, we recalculate 'startTime' only if a significant drift or session reset is detected.
+        if currentRun.startTimeEpoch then
+            local expectedStartTime = GetTime() - (time() - currentRun.startTimeEpoch)
+            if not currentRun.startTime or abs(currentRun.startTime - expectedStartTime) > 2 then
+                currentRun.startTime = expectedStartTime
+            end
+        else
         -- Fix session-relative timer after reload/login
         if currentRun.startTimeEpoch then
              -- Re-calculate local startTime relative to now ONLY if GetTime() reset (session change)
@@ -588,6 +600,7 @@ function addon:StartRun(zoneID)
 
     addon:SaveRunState()
     addon:ShowProgressFrame()
+    addon:SaveRunState()
 end
 
 function addon:StopRun()
