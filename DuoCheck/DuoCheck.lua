@@ -444,7 +444,6 @@ function addon:UpdateSummaryFrame()
         end
     end
 
-    -- Hide unused lines from the object pool
     -- Hide unused lines
     for i = count + 1, #summaryFrame.Lines do
         summaryFrame.Lines[i]:Hide()
