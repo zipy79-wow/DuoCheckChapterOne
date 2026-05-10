@@ -9,6 +9,11 @@ local GetTime = GetTime
 local date = date
 local abs = math.abs
 local floor = math.floor
+local math = math
+local math_abs = math.abs
+local math_floor = math.floor
+local math_abs = math.abs
+local date = date
 
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
@@ -32,6 +37,15 @@ local DUNGEONS = {
             "Cookie",
             "Captain Greenskin",
             "Edwin VanCleef"
+        },
+        bossLookup = {
+            ["Rhahk'Zor"] = true,
+            ["Sneed"] = true,
+            ["Gilnid"] = true,
+            ["Mr. Smite"] = true,
+            ["Cookie"] = true,
+            ["Captain Greenskin"] = true,
+            ["Edwin VanCleef"] = true
         }
     },
     [1413] = { -- Wailing Caverns (Classic Map ID: 1413)
@@ -46,6 +60,16 @@ local DUNGEONS = {
             "Lord Serpentis",
             "Verdan the Everliving",
             "Mutanus the Devourer"
+        },
+        bossLookup = {
+            ["Lady Anacondra"] = true,
+            ["Lord Cobrahn"] = true,
+            ["Kresh"] = true,
+            ["Lord Pythas"] = true,
+            ["Skum"] = true,
+            ["Lord Serpentis"] = true,
+            ["Verdan the Everliving"] = true,
+            ["Mutanus the Devourer"] = true
         }
     },
     [1414] = { -- Shadowfang Keep (Classic Map ID: 1414)
@@ -60,6 +84,16 @@ local DUNGEONS = {
             "Fenrus the Devourer",
             "Wolf Master Nandos",
             "Archmage Arugal"
+        },
+        bossLookup = {
+            ["Rethilgore"] = true,
+            ["Razorclaw the Butcher"] = true,
+            ["Baron Silverlaine"] = true,
+            ["Commander Springvale"] = true,
+            ["Odo the Watcher"] = true,
+            ["Fenrus the Devourer"] = true,
+            ["Wolf Master Nandos"] = true,
+            ["Archmage Arugal"] = true
         }
     },
     [1415] = { -- Blackfathom Deeps (Classic Map ID: 1415)
@@ -73,11 +107,41 @@ local DUNGEONS = {
             "Lorgus Jett",
             "Twilight Lord Kelris",
             "Aku'mai"
+        },
+        bossLookup = {
+            ["Ghamoo-ra"] = true,
+            ["Lady Sarevess"] = true,
+            ["Gelihast"] = true,
+            ["Baron Aquanis"] = true,
+            ["Lorgus Jett"] = true,
+            ["Twilight Lord Kelris"] = true,
+            ["Aku'mai"] = true
         }
     }
 }
 
+-- Preprocess Boss Lookup Tables
+for _, dungeon in pairs(DUNGEONS) do
+    dungeon.bossLookup = {}
+    for _, bossName in ipairs(dungeon.bosses) do
+        dungeon.bossLookup[bossName] = true
+-- Generate bossLookup dynamically for O(1) checks
+for _, dungeon in pairs(DUNGEONS) do
+    dungeon.bossLookup = {}
+    for _, boss in ipairs(dungeon.bosses) do
+        dungeon.bossLookup[boss] = true
+    end
+end
+
 local DUNGEON_ORDER = {1417, 1413, 1414, 1415} -- DM, WC, SFK, BFD (Classic IDs)
+
+-- Pre-generate lookup tables for optimized boss checking
+for _, dungeon in pairs(DUNGEONS) do
+    dungeon.bossLookup = {}
+    for _, bossName in ipairs(dungeon.bosses) do
+        dungeon.bossLookup[bossName] = true
+    end
+end
 
 -- State
 local currentZoneID = nil
@@ -164,16 +228,17 @@ function addon:CreateProgressFrame()
     f.StrikeLines = {} -- For strikethrough effect
 
     local timeSinceLastUpdate = 0
-    f.lastSecond = -1
+    local lastSecond = -1
     f:SetScript("OnUpdate", function(self, elapsed)
         timeSinceLastUpdate = timeSinceLastUpdate + elapsed
-        if timeSinceLastUpdate >= 0.1 then
+        if timeSinceLastUpdate >= 1.0 then
             if currentRun and not currentRun.done then
                 local duration = GetTime() - currentRun.startTime
-                local currentSecond = floor(duration)
-                if currentSecond ~= self.lastSecond then
+                local seconds = floor(duration)
+                local seconds = math.floor(duration)
+                if seconds ~= lastSecond then
                     self.Timer:SetText(date("!%H:%M:%S", duration))
-                    self.lastSecond = currentSecond
+                    lastSecond = seconds
                 end
             end
             timeSinceLastUpdate = 0
@@ -183,13 +248,18 @@ function addon:CreateProgressFrame()
     progressFrame = f
 end
 
+function addon:UpdateMobCount()
+    if not progressFrame or not currentRun then return end
+    progressFrame.Mobs:SetText("Mobs Killed: " .. currentRun.mobCount)
+end
+
 function addon:UpdateProgressFrame()
     if not progressFrame or not currentRun then return end
 
     local dungeon = DUNGEONS[currentRun.zoneID]
     progressFrame.Title:SetText(dungeon.name)
     progressFrame.Info:SetText(currentRun.mode .. " - Lvl " .. currentRun.startLevel .. " (Cap " .. dungeon.cap .. ")")
-    progressFrame.Mobs:SetText("Mobs Killed: " .. currentRun.mobCount)
+    addon:UpdateMobCount()
 
     -- Update Boss List
     local yOffset = 0
@@ -240,6 +310,11 @@ function addon:UpdateProgressFrame()
 
     -- Adjust height
     progressFrame:SetHeight(100 + (#dungeon.bosses * 15) + 20)
+end
+
+function addon:UpdateMobCount()
+    if not progressFrame or not currentRun then return end
+    progressFrame.Mobs:SetText("Mobs Killed: " .. currentRun.mobCount)
 end
 
 -- UI - Summary Frame
@@ -337,11 +412,14 @@ function addon:UpdateSummaryFrame()
         local line = summaryFrame.Lines[count]
         if not line then
             line = summaryFrame.Content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            line:SetJustifyH("LEFT")
-            line:SetPoint("TOPLEFT", 0, yOffset)
-            line:SetWidth(270)
             summaryFrame.Lines[count] = line
         end
+
+        line:ClearAllPoints()
+        line:SetFontObject("GameFontNormal")
+        line:SetJustifyH("LEFT")
+        line:SetPoint("TOPLEFT", 0, yOffset)
+        line:SetWidth(270)
 
         if record and record.done then
             line:SetText("|cff00ff00[x] " .. dungeon.name .. "|r")
@@ -356,11 +434,15 @@ function addon:UpdateSummaryFrame()
             local detailLine = summaryFrame.Lines[count]
             if not detailLine then
                 detailLine = summaryFrame.Content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-                detailLine:SetJustifyH("LEFT")
-                detailLine:SetPoint("TOPLEFT", 15, yOffset - 15)
-                 detailLine:SetWidth(255)
                 summaryFrame.Lines[count] = detailLine
             end
+
+            detailLine:ClearAllPoints()
+            detailLine:SetFontObject("GameFontHighlightSmall")
+            detailLine:SetJustifyH("LEFT")
+            detailLine:SetPoint("TOPLEFT", 15, yOffset - 15)
+            detailLine:SetWidth(255)
+
             local txt = string.format("Completed: %s | Time: %s | Lvl: %s | Mode: %s",
                 record.last.whenText, record.last.durationText, record.last.level, record.last.mode)
             detailLine:SetText(txt)
@@ -371,7 +453,8 @@ function addon:UpdateSummaryFrame()
         end
     end
 
-    -- Hide unused lines (fix bug)
+    -- Hide unused lines from the object pool
+    -- Hide unused lines
     for i = count + 1, #summaryFrame.Lines do
         summaryFrame.Lines[i]:Hide()
     end
@@ -394,27 +477,71 @@ function addon:StartRun(zoneID)
     if DuoCheckDungeonsDB.currentRun and DuoCheckDungeonsDB.currentRun.zoneID == zoneID and not DuoCheckDungeonsDB.currentRun.done then
         currentRun = DuoCheckDungeonsDB.currentRun
 
-        -- Fix time offset after reload or session restart
-        local now = GetTime()
-        local nowEpoch = time()
-
+        -- Fix session-relative timer after reload/login
         if currentRun.startTimeEpoch then
-            local elapsedEpoch = nowEpoch - currentRun.startTimeEpoch
-            local expectedStartTime = now - elapsedEpoch
-
-            -- If GetTime() reset (now < original startTime) or significant drift (>2s)
-            if currentRun.startTime > now or abs(currentRun.startTime - expectedStartTime) > 2 then
-                currentRun.startTime = expectedStartTime
-            end
-        else
-            -- Legacy: initialize epoch if missing, but reset startTime if GetTime() appears invalid
-            local duration = 0
-            if currentRun.startTime > now then
+            local elapsed = time() - currentRun.startTimeEpoch
+            currentRun.startTime = GetTime() - elapsed
+        elseif currentRun.startTime then
+            -- Attempt to recover from legacy run without epoch
+            local now = GetTime()
+            if now < currentRun.startTime then
+                -- GetTime reset, we lost exact start but can set epoch to now for future reloads
+                currentRun.startTimeEpoch = time()
                 currentRun.startTime = now
             else
-                duration = now - currentRun.startTime
+                -- GetTime didn't reset, we can calculate epoch accurately
+                currentRun.startTimeEpoch = time() - (now - currentRun.startTime)
             end
-            currentRun.startTimeEpoch = nowEpoch - floor(duration)
+        -- Fix time offset from session reload.
+        -- GetTime() is session-relative and resets on login, making stored 'startTime' invalid.
+        -- We use 'startTimeEpoch' (Unix timestamp) to calculate total elapsed time, then
+        -- back-calculate a new local 'startTime' relative to the current session's GetTime().
+        if currentRun.startTimeEpoch then
+             -- Re-calculate local startTime relative to now ONLY if session reset or drift detected
+             local elapsedEpoch = time() - currentRun.startTimeEpoch
+             local elapsedSession = GetTime() - currentRun.startTime
+
+             -- If drift > 2 seconds or session reset (elapsedSession < 0), recalculate
+             if elapsedSession < 0 or abs(elapsedEpoch - elapsedSession) > 2 then
+                 currentRun.startTime = GetTime() - elapsedEpoch
+             end
+        else
+            -- Legacy restoration: missing startTimeEpoch
+            if GetTime() > currentRun.startTime then
+                -- Same session (UI Reload), extrapolate epoch
+                currentRun.startTimeEpoch = time() - (GetTime() - currentRun.startTime)
+            else
+                -- New session, must reset
+                currentRun.startTime = GetTime()
+                currentRun.startTimeEpoch = time()
+            end
+             local elapsed = time() - currentRun.startTimeEpoch
+             currentRun.startTime = GetTime() - elapsed
+        else
+            -- Legacy or fresh fallback
+            currentRun.startTime = GetTime()
+            currentRun.startTimeEpoch = time()
+        end
+
+        -- Recalculate bossesRemaining if missing (legacy)
+        if not currentRun.bossesRemaining then
+            local remaining = 0
+            for _, bossName in ipairs(dungeon.bosses) do
+                if not currentRun.bossesKilled[bossName] then
+        -- Recalculate bossesRemaining if missing (legacy restoration)
+        if not currentRun.bossesRemaining then
+            local remaining = 0
+            for _, boss in ipairs(dungeon.bosses) do
+                if not currentRun.bossesKilled[boss] then
+        -- Initialize/Recalculate bossesRemaining for restoration
+        if not currentRun.bossesRemaining then
+            local remaining = 0
+            for _, bossName in ipairs(dungeon.bosses) do
+                if currentRun.bossesKilled[bossName] == false then
+                    remaining = remaining + 1
+                end
+            end
+            currentRun.bossesRemaining = remaining
         end
 
         Print("Restored run for " .. dungeon.name)
@@ -427,13 +554,10 @@ function addon:StartRun(zoneID)
             startLevel = UnitLevel("player"),
             mode = mode,
             bossesKilled = {},
+            bossesRemaining = #dungeon.bosses,
             mobCount = 0,
             done = false
         }
-        -- Initialize bossesKilled
-        for _, boss in ipairs(dungeon.bosses) do
-            currentRun.bossesKilled[boss] = false
-        end
         Print("Started tracking: " .. dungeon.name .. " (" .. mode .. ")")
         if progressFrame then progressFrame.lastSecond = -1 end
     end
@@ -493,17 +617,51 @@ function addon:OnCombatLog()
         if destGUID and (strsub(destGUID, 1, 8) == "Creature" or strsub(destGUID, 1, 7) == "Vehicle") then
             currentRun.mobCount = currentRun.mobCount + 1
 
-            -- Check if Boss
+            -- Check if Boss - O(1) lookup using static data
             local dungeon = DUNGEONS[currentRun.zoneID]
+            if destName and dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
+                currentRun.bossesKilled[destName] = time()
+                currentRun.bossesRemaining = currentRun.bossesRemaining - 1
+            -- Check if Boss
+            if destName and currentRun.bossesKilled[destName] == false then
+                currentRun.bossesKilled[destName] = time()
+                currentRun.bossesRemaining = currentRun.bossesRemaining - 1
+            local dungeon = DUNGEONS[currentRun.zoneID]
+            local isBossKill = false
+            local isBoss = false
+            for _, bossName in ipairs(dungeon.bosses) do
+                if destName == bossName then
+                    isBoss = true
+                    if not currentRun.bossesKilled[bossName] then
+                        currentRun.bossesKilled[bossName] = time()
+                        addon:AnnounceBossKill(bossName)
+                    end
+            local bossKilled = false
             for _, bossName in ipairs(dungeon.bosses) do
                 if destName == bossName and not currentRun.bossesKilled[bossName] then
                     currentRun.bossesKilled[bossName] = time()
                     addon:AnnounceBossKill(bossName)
+                    isBossKill = true
+                    break -- Can stop checking bosses if one matched
+                    bossKilled = true
                 end
+            if destName and dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
+                currentRun.bossesKilled[destName] = time()
+                addon:AnnounceBossKill(destName)
             end
 
-            addon:CheckCompletion()
-            addon:UpdateProgressFrame()
+            if isBossKill then
+                addon:CheckCompletion()
+                addon:UpdateProgressFrame()
+                addon:SaveRunState() -- Save after updates
+            end
+            if isBoss then
+            if bossKilled then
+                addon:CheckCompletion()
+                addon:UpdateProgressFrame()
+            else
+                addon:UpdateMobCount()
+            end
             addon:SaveRunState() -- Save after updates
         end
     end
@@ -518,16 +676,10 @@ end
 function addon:CheckCompletion()
     if not currentRun or currentRun.done then return end
 
+    if currentRun.bossesRemaining == 0 then
+        local dungeon = DUNGEONS[currentRun.zoneID]
     local dungeon = DUNGEONS[currentRun.zoneID]
-    local allDead = true
-    for _, bossName in ipairs(dungeon.bosses) do
-        if not currentRun.bossesKilled[bossName] then
-            allDead = false
-            break
-        end
-    end
-
-    if allDead then
+    if currentRun.bossesRemaining == 0 then
         local currentLevel = UnitLevel("player")
         if currentLevel <= dungeon.cap then
              addon:CompleteRun()
