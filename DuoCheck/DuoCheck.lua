@@ -80,18 +80,6 @@ local DUNGEONS = {
 }
 
 -- Preprocess Boss Lookup Tables
-for _, dungeon in pairs(DUNGEONS) do
-    dungeon.bossLookup = {}
-    for _, bossName in ipairs(dungeon.bosses) do
-        dungeon.bossLookup[bossName] = true
--- Generate bossLookup dynamically for O(1) checks
-for _, dungeon in pairs(DUNGEONS) do
-    dungeon.bossLookup = {}
-    for _, boss in ipairs(dungeon.bosses) do
-        dungeon.bossLookup[boss] = true
-    end
-end
-
 local DUNGEON_ORDER = {1417, 1413, 1414, 1415} -- DM, WC, SFK, BFD (Classic IDs)
 
 -- Pre-generate lookup tables for optimized boss checking
@@ -478,6 +466,7 @@ function addon:StartRun(zoneID)
     end
 
     addon:ShowProgressFrame()
+    addon:SaveRunState()
 end
 
 function addon:StopRun()
@@ -539,42 +528,20 @@ function addon:OnCombatLog()
 
             -- Check if Boss
             local dungeon = DUNGEONS[currentRun.zoneID]
-            local isBossKill = false
-            local isBoss = false
-            for _, bossName in ipairs(dungeon.bosses) do
-                if destName == bossName then
-                    isBoss = true
-                    if not currentRun.bossesKilled[bossName] then
-                        currentRun.bossesKilled[bossName] = time()
-                        addon:AnnounceBossKill(bossName)
-                    end
             local bossKilled = false
-            for _, bossName in ipairs(dungeon.bosses) do
-                if destName == bossName and not currentRun.bossesKilled[bossName] then
-                    currentRun.bossesKilled[bossName] = time()
-                    addon:AnnounceBossKill(bossName)
-                    isBossKill = true
-                    break -- Can stop checking bosses if one matched
-                    bossKilled = true
-                end
             if destName and dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
                 currentRun.bossesKilled[destName] = time()
                 addon:AnnounceBossKill(destName)
+                bossKilled = true
             end
 
-            if isBossKill then
-                addon:CheckCompletion()
-                addon:UpdateProgressFrame()
-                addon:SaveRunState() -- Save after updates
-            end
-            if isBoss then
             if bossKilled then
                 addon:CheckCompletion()
                 addon:UpdateProgressFrame()
+                addon:SaveRunState() -- Save after updates
             else
                 addon:UpdateMobCount()
             end
-            addon:SaveRunState() -- Save after updates
         end
     end
 end
