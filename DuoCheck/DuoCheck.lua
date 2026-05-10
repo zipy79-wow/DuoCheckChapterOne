@@ -5,6 +5,10 @@ local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
 local strsub = strsub
 local ipairs = ipairs
 local time = time
+local GetTime = GetTime
+local date = date
+local math_abs = math.abs
+local math_floor = math.floor
 
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
@@ -160,12 +164,17 @@ function addon:CreateProgressFrame()
     f.StrikeLines = {} -- For strikethrough effect
 
     local timeSinceLastUpdate = 0
+    f.lastSecond = -1
     f:SetScript("OnUpdate", function(self, elapsed)
         timeSinceLastUpdate = timeSinceLastUpdate + elapsed
         if timeSinceLastUpdate >= 0.1 then
             if currentRun and not currentRun.done then
                 local duration = GetTime() - currentRun.startTime
-                self.Timer:SetText(date("!%H:%M:%S", duration))
+                local currentSecond = math_floor(duration)
+                if currentSecond ~= self.lastSecond then
+                    self.Timer:SetText(date("!%H:%M:%S", duration))
+                    self.lastSecond = currentSecond
+                end
             end
             timeSinceLastUpdate = 0
         end
@@ -394,9 +403,14 @@ function addon:StartRun(zoneID)
         -- Let's stick to simple reload logic: If persisted run exists, we use it, but fix startTime.
 
         if currentRun.startTimeEpoch then
-             -- Re-calculate local startTime relative to now
-             local elapsed = time() - currentRun.startTimeEpoch
-             currentRun.startTime = GetTime() - elapsed
+             -- Re-calculate local startTime relative to now ONLY if GetTime() reset (session change)
+             local epochElapsed = time() - currentRun.startTimeEpoch
+             local sessionElapsed = GetTime() - currentRun.startTime
+
+             -- If drift is more than 2 seconds, assume session changed (reload vs login)
+             if math_abs(epochElapsed - sessionElapsed) > 2 then
+                currentRun.startTime = GetTime() - epochElapsed
+             end
         else
             -- Legacy or fresh
             currentRun.startTime = GetTime()
@@ -422,6 +436,7 @@ function addon:StartRun(zoneID)
         Print("Started tracking: " .. dungeon.name .. " (" .. mode .. ")")
     end
 
+    addon:SaveRunState()
     addon:ShowProgressFrame()
 end
 
