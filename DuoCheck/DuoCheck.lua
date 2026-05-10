@@ -5,6 +5,9 @@ local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
 local strsub = strsub
 local ipairs = ipairs
 local time = time
+local GetTime = GetTime
+local date = date
+local floor = math.floor
 
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
@@ -160,12 +163,17 @@ function addon:CreateProgressFrame()
     f.StrikeLines = {} -- For strikethrough effect
 
     local timeSinceLastUpdate = 0
+    local lastSecond = -1
     f:SetScript("OnUpdate", function(self, elapsed)
         timeSinceLastUpdate = timeSinceLastUpdate + elapsed
         if timeSinceLastUpdate >= 0.1 then
             if currentRun and not currentRun.done then
                 local duration = GetTime() - currentRun.startTime
-                self.Timer:SetText(date("!%H:%M:%S", duration))
+                local seconds = floor(duration)
+                if seconds ~= lastSecond then
+                    self.Timer:SetText(date("!%H:%M:%S", duration))
+                    lastSecond = seconds
+                end
             end
             timeSinceLastUpdate = 0
         end
