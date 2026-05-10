@@ -9,8 +9,6 @@ local GetTime = GetTime
 local date = date
 local math_abs = math.abs
 local math_floor = math.floor
-local math_abs = math.abs
-local date = date
 
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
