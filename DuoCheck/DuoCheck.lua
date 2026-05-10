@@ -403,6 +403,17 @@ function addon:StartRun(zoneID)
             currentRun.startTimeEpoch = time()
         end
 
+        -- Recalculate bossesRemaining if missing (legacy)
+        if not currentRun.bossesRemaining then
+            local remaining = 0
+            for _, bossName in ipairs(dungeon.bosses) do
+                if not currentRun.bossesKilled[bossName] then
+                    remaining = remaining + 1
+                end
+            end
+            currentRun.bossesRemaining = remaining
+        end
+
         Print("Restored run for " .. dungeon.name)
     else
         currentRun = {
@@ -412,6 +423,7 @@ function addon:StartRun(zoneID)
             startLevel = UnitLevel("player"),
             mode = mode,
             bossesKilled = {},
+            bossesRemaining = #dungeon.bosses,
             mobCount = 0,
             done = false
         }
@@ -483,12 +495,10 @@ function addon:OnCombatLog()
             currentRun.mobCount = currentRun.mobCount + 1
 
             -- Check if Boss
-            local dungeon = DUNGEONS[currentRun.zoneID]
-            for _, bossName in ipairs(dungeon.bosses) do
-                if destName == bossName and not currentRun.bossesKilled[bossName] then
-                    currentRun.bossesKilled[bossName] = time()
-                    addon:AnnounceBossKill(bossName)
-                end
+            if destName and currentRun.bossesKilled[destName] == false then
+                currentRun.bossesKilled[destName] = time()
+                currentRun.bossesRemaining = currentRun.bossesRemaining - 1
+                addon:AnnounceBossKill(destName)
             end
 
             addon:CheckCompletion()
@@ -508,15 +518,7 @@ function addon:CheckCompletion()
     if not currentRun or currentRun.done then return end
 
     local dungeon = DUNGEONS[currentRun.zoneID]
-    local allDead = true
-    for _, bossName in ipairs(dungeon.bosses) do
-        if not currentRun.bossesKilled[bossName] then
-            allDead = false
-            break
-        end
-    end
-
-    if allDead then
+    if currentRun.bossesRemaining == 0 then
         local currentLevel = UnitLevel("player")
         if currentLevel <= dungeon.cap then
              addon:CompleteRun()
