@@ -5,6 +5,8 @@ local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
 local strsub = strsub
 local ipairs = ipairs
 local time = time
+local GetTime = GetTime
+local date = date
 
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
@@ -162,7 +164,7 @@ function addon:CreateProgressFrame()
     local timeSinceLastUpdate = 0
     f:SetScript("OnUpdate", function(self, elapsed)
         timeSinceLastUpdate = timeSinceLastUpdate + elapsed
-        if timeSinceLastUpdate >= 0.1 then
+        if timeSinceLastUpdate >= 1.0 then
             if currentRun and not currentRun.done then
                 local duration = GetTime() - currentRun.startTime
                 self.Timer:SetText(date("!%H:%M:%S", duration))
