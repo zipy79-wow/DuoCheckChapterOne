@@ -191,7 +191,7 @@ function addon:CreateProgressFrame()
     local lastSecond = -1
     f:SetScript("OnUpdate", function(self, elapsed)
         timeSinceLastUpdate = timeSinceLastUpdate + elapsed
-        if timeSinceLastUpdate >= 0.1 then
+        if timeSinceLastUpdate >= 1.0 then
             if currentRun and not currentRun.done then
                 local duration = GetTime() - currentRun.startTime
                 local seconds = math.floor(duration)
