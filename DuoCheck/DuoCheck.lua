@@ -21,6 +21,22 @@ addon.frame:RegisterEvent("PLAYER_LOGOUT")
 -- Constants
 -- Updated with Classic Era Map IDs
 local DUNGEONS = {
+    [2437] = { -- Ragefire Chasm
+        name = "Ragefire Chasm",
+        cap = 18,
+        bosses = {
+            "Oggleflint",
+            "Taragaman the Hungerer",
+            "Jergosh the Invoker",
+            "Bazzalan"
+        },
+        bossLookup = {
+            ["Oggleflint"] = true,
+            ["Taragaman the Hungerer"] = true,
+            ["Jergosh the Invoker"] = true,
+            ["Bazzalan"] = true
+        }
+    },
     [1417] = { -- The Deadmines (Classic Map ID: 1417)
         name = "The Deadmines",
         cap = 20,
@@ -116,7 +132,7 @@ local DUNGEONS = {
 }
 
 -- Preprocess Boss Lookup Tables
-local DUNGEON_ORDER = {1417, 1413, 1414, 1415} -- DM, WC, SFK, BFD (Classic IDs)
+local DUNGEON_ORDER = {2437, 1417, 1413, 1414, 1415} -- RFC, DM, WC, SFK, BFD (Classic IDs)
 
 -- State
 local currentZoneID = nil
@@ -542,19 +558,11 @@ function addon:OnCombatLog()
         if destGUID and (strsub(destGUID, 1, 8) == "Creature" or strsub(destGUID, 1, 7) == "Vehicle") then
             currentRun.mobCount = currentRun.mobCount + 1
 
-            -- Check if Boss - O(1) lookup using static data
-            local dungeon = DUNGEONS[currentRun.zoneID]
-            if destName and dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
-                currentRun.bossesKilled[destName] = time()
-                currentRun.bossesRemaining = currentRun.bossesRemaining - 1
-            -- Check if Boss
-            if destName and currentRun.bossesKilled[destName] == false then
-                currentRun.bossesKilled[destName] = time()
-                currentRun.bossesRemaining = currentRun.bossesRemaining - 1
             local dungeon = DUNGEONS[currentRun.zoneID]
             local bossKilled = false
             if destName and dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
                 currentRun.bossesKilled[destName] = time()
+                currentRun.bossesRemaining = currentRun.bossesRemaining - 1
                 addon:AnnounceBossKill(destName)
                 bossKilled = true
             end
