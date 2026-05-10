@@ -7,15 +7,8 @@ local ipairs = ipairs
 local time = time
 local GetTime = GetTime
 local date = date
-local math_abs = math.abs
-local math_floor = math.floor
 local abs = math.abs
 local floor = math.floor
-local math = math
-local math_abs = math.abs
-local math_floor = math.floor
-local math_abs = math.abs
-local date = date
 
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
@@ -226,7 +219,6 @@ function addon:CreateProgressFrame()
     f.StrikeLines = {} -- For strikethrough effect
 
     local timeSinceLastUpdate = 0
-    f.lastSecond = -1
     local lastSecond = -1
     f:SetScript("OnUpdate", function(self, elapsed)
         timeSinceLastUpdate = timeSinceLastUpdate + elapsed
@@ -237,15 +229,6 @@ function addon:CreateProgressFrame()
                 if currentSecond ~= lastSecond then
                     self.Timer:SetText(date("!%H:%M:%S", duration))
                     lastSecond = currentSecond
-                local currentSecond = math_floor(duration)
-                if currentSecond ~= self.lastSecond then
-                    self.Timer:SetText(date("!%H:%M:%S", duration))
-                    self.lastSecond = currentSecond
-                local seconds = floor(duration)
-                local seconds = math.floor(duration)
-                if seconds ~= lastSecond then
-                    self.Timer:SetText(date("!%H:%M:%S", duration))
-                    lastSecond = seconds
                 end
             end
             timeSinceLastUpdate = 0
@@ -539,7 +522,13 @@ function addon:StartRun(zoneID)
                 currentRun.startTimeEpoch = time()
             end
              local elapsed = time() - currentRun.startTimeEpoch
-             currentRun.startTime = GetTime() - elapsed
+             local expectedStartTime = GetTime() - elapsed
+
+             -- If GetTime() reset (login) or significant drift (>2s), fix it.
+             -- Otherwise preserve original startTime for sub-second precision.
+             if not currentRun.startTime or currentRun.startTime > GetTime() or abs(currentRun.startTime - expectedStartTime) > 2 then
+                 currentRun.startTime = expectedStartTime
+             end
         else
             -- Legacy or fresh fallback
             currentRun.startTime = GetTime()
