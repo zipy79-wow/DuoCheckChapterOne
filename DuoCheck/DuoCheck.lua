@@ -5,6 +5,9 @@ local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
 local strsub = strsub
 local ipairs = ipairs
 local time = time
+local GetTime = GetTime
+local date = date
+local abs = math.abs
 
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
@@ -370,6 +373,12 @@ end
 
 
 -- Tracking Logic
+function addon:SaveRunState()
+    if currentRun then
+        DuoCheckDungeonsDB.currentRun = currentRun
+    end
+end
+
 function addon:StartRun(zoneID)
     local dungeon = DUNGEONS[zoneID]
     local numGroup = GetNumGroupMembers()
@@ -394,13 +403,24 @@ function addon:StartRun(zoneID)
         -- Let's stick to simple reload logic: If persisted run exists, we use it, but fix startTime.
 
         if currentRun.startTimeEpoch then
-             -- Re-calculate local startTime relative to now
-             local elapsed = time() - currentRun.startTimeEpoch
-             currentRun.startTime = GetTime() - elapsed
+             -- Re-calculate local startTime relative to now ONLY if session reset or drift detected
+             local elapsedEpoch = time() - currentRun.startTimeEpoch
+             local elapsedSession = GetTime() - currentRun.startTime
+
+             -- If drift > 2 seconds or session reset (elapsedSession < 0), recalculate
+             if elapsedSession < 0 or abs(elapsedEpoch - elapsedSession) > 2 then
+                 currentRun.startTime = GetTime() - elapsedEpoch
+             end
         else
-            -- Legacy or fresh
-            currentRun.startTime = GetTime()
-            currentRun.startTimeEpoch = time()
+            -- Legacy restoration: missing startTimeEpoch
+            if GetTime() > currentRun.startTime then
+                -- Same session (UI Reload), extrapolate epoch
+                currentRun.startTimeEpoch = time() - (GetTime() - currentRun.startTime)
+            else
+                -- New session, must reset
+                currentRun.startTime = GetTime()
+                currentRun.startTimeEpoch = time()
+            end
         end
 
         Print("Restored run for " .. dungeon.name)
@@ -422,6 +442,7 @@ function addon:StartRun(zoneID)
         Print("Started tracking: " .. dungeon.name .. " (" .. mode .. ")")
     end
 
+    addon:SaveRunState()
     addon:ShowProgressFrame()
 end
 
@@ -429,12 +450,6 @@ function addon:StopRun()
     currentRun = nil
     DuoCheckDungeonsDB.currentRun = nil -- Clear persistence
     if progressFrame then progressFrame:Hide() end
-end
-
-function addon:SaveRunState()
-    if currentRun then
-        DuoCheckDungeonsDB.currentRun = currentRun
-    end
 end
 
 function addon:CheckZone()
