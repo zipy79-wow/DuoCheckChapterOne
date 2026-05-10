@@ -7,6 +7,8 @@ local ipairs = ipairs
 local time = time
 local GetTime = GetTime
 local date = date
+local math_abs = math.abs
+local math_floor = math.floor
 local abs = math.abs
 local floor = math.floor
 local math = math
@@ -135,6 +137,7 @@ end
 
 local DUNGEON_ORDER = {1417, 1413, 1414, 1415} -- DM, WC, SFK, BFD (Classic IDs)
 
+-- Pre-calculate boss lookup for O(1) identification
 -- Pre-generate lookup tables for optimized boss checking
 for _, dungeon in pairs(DUNGEONS) do
     dungeon.bossLookup = {}
@@ -228,6 +231,7 @@ function addon:CreateProgressFrame()
     f.StrikeLines = {} -- For strikethrough effect
 
     local timeSinceLastUpdate = 0
+    f.lastSecond = -1
     local lastSecond = -1
     f:SetScript("OnUpdate", function(self, elapsed)
         timeSinceLastUpdate = timeSinceLastUpdate + elapsed
@@ -238,6 +242,10 @@ function addon:CreateProgressFrame()
                 if currentSecond ~= lastSecond then
                     self.Timer:SetText(date("!%H:%M:%S", duration))
                     lastSecond = currentSecond
+                local currentSecond = math_floor(duration)
+                if currentSecond ~= self.lastSecond then
+                    self.Timer:SetText(date("!%H:%M:%S", duration))
+                    self.lastSecond = currentSecond
                 local seconds = floor(duration)
                 local seconds = math.floor(duration)
                 if seconds ~= lastSecond then
@@ -491,6 +499,14 @@ function addon:StartRun(zoneID)
         else
         -- Fix session-relative timer after reload/login
         if currentRun.startTimeEpoch then
+             -- Re-calculate local startTime relative to now ONLY if GetTime() reset (session change)
+             local epochElapsed = time() - currentRun.startTimeEpoch
+             local sessionElapsed = GetTime() - currentRun.startTime
+
+             -- If drift is more than 2 seconds, assume session changed (reload vs login)
+             if math_abs(epochElapsed - sessionElapsed) > 2 then
+                currentRun.startTime = GetTime() - epochElapsed
+             end
             local elapsed = time() - currentRun.startTimeEpoch
             currentRun.startTime = GetTime() - elapsed
         elseif currentRun.startTime then
@@ -535,6 +551,14 @@ function addon:StartRun(zoneID)
             currentRun.startTimeEpoch = time()
         end
 
+        -- Re-calculate bossesRemaining for restored runs if missing or needed
+        local remaining = 0
+        for _, bossName in ipairs(dungeon.bosses) do
+            if not currentRun.bossesKilled[bossName] then
+                remaining = remaining + 1
+            end
+        end
+        currentRun.bossesRemaining = remaining
         -- Recalculate bossesRemaining if missing (legacy)
         if not currentRun.bossesRemaining then
             local remaining = 0
@@ -557,6 +581,7 @@ function addon:StartRun(zoneID)
         end
 
         Print("Restored run for " .. dungeon.name)
+        if progressFrame then progressFrame.lastSecond = -1 end
     else
         currentRun = {
             zoneID = zoneID,
@@ -570,6 +595,7 @@ function addon:StartRun(zoneID)
             done = false
         }
         Print("Started tracking: " .. dungeon.name .. " (" .. mode .. ")")
+        if progressFrame then progressFrame.lastSecond = -1 end
     end
 
     addon:SaveRunState()
@@ -638,6 +664,25 @@ function addon:OnCombatLog()
                 currentRun.bossesKilled[destName] = time()
                 currentRun.bossesRemaining = currentRun.bossesRemaining - 1
             local dungeon = DUNGEONS[currentRun.zoneID]
+            if dungeon.bossLookup[destName] and not currentRun.bossesKilled[destName] then
+                currentRun.bossesKilled[destName] = time()
+                currentRun.bossesRemaining = currentRun.bossesRemaining - 1
+                addon:AnnounceBossKill(destName)
+
+                addon:CheckCompletion()
+                addon:UpdateProgressFrame()
+                addon:SaveRunState() -- Save after updates
+            else
+                -- Trash mob killed: minimize overhead
+                if progressFrame and progressFrame:IsShown() then
+                    progressFrame.Mobs:SetText("Mobs Killed: " .. currentRun.mobCount)
+                end
+
+                -- Throttle database saves for trash
+                if currentRun.mobCount % 10 == 0 then
+                    addon:SaveRunState()
+                end
+            end
             local isBossKill = false
             local isBoss = false
             for _, bossName in ipairs(dungeon.bosses) do
@@ -690,6 +735,7 @@ function addon:CheckCompletion()
     if currentRun.bossesRemaining == 0 then
         local dungeon = DUNGEONS[currentRun.zoneID]
     local dungeon = DUNGEONS[currentRun.zoneID]
+
     if currentRun.bossesRemaining == 0 then
         local currentLevel = UnitLevel("player")
         if currentLevel <= dungeon.cap then
