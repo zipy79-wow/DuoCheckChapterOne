@@ -468,6 +468,21 @@ function addon:StartRun(zoneID)
     if DuoCheckDungeonsDB.currentRun and DuoCheckDungeonsDB.currentRun.zoneID == zoneID and not DuoCheckDungeonsDB.currentRun.done then
         currentRun = DuoCheckDungeonsDB.currentRun
 
+        -- Fix session-relative timer after reload/login
+        if currentRun.startTimeEpoch then
+            local elapsed = time() - currentRun.startTimeEpoch
+            currentRun.startTime = GetTime() - elapsed
+        elseif currentRun.startTime then
+            -- Attempt to recover from legacy run without epoch
+            local now = GetTime()
+            if now < currentRun.startTime then
+                -- GetTime reset, we lost exact start but can set epoch to now for future reloads
+                currentRun.startTimeEpoch = time()
+                currentRun.startTime = now
+            else
+                -- GetTime didn't reset, we can calculate epoch accurately
+                currentRun.startTimeEpoch = time() - (now - currentRun.startTime)
+            end
         -- Fix time offset from session reload.
         -- GetTime() is session-relative and resets on login, making stored 'startTime' invalid.
         -- We use 'startTimeEpoch' (Unix timestamp) to calculate total elapsed time, then
@@ -513,6 +528,7 @@ function addon:StartRun(zoneID)
         Print("Started tracking: " .. dungeon.name .. " (" .. mode .. ")")
     end
 
+    addon:SaveRunState()
     addon:ShowProgressFrame()
 end
 
