@@ -523,6 +523,11 @@ function addon:StartRun(zoneID)
             currentRun.startTimeEpoch = time()
         end
 
+        -- Recalculate bossesRemaining if missing (legacy)
+        if not currentRun.bossesRemaining then
+            local remaining = 0
+            for _, bossName in ipairs(dungeon.bosses) do
+                if not currentRun.bossesKilled[bossName] then
         -- Recalculate bossesRemaining if missing (legacy restoration)
         if not currentRun.bossesRemaining then
             local remaining = 0
