@@ -5,6 +5,10 @@ local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
 local strsub = strsub
 local ipairs = ipairs
 local time = time
+local GetTime = GetTime
+local date = date
+local abs = math.abs
+local floor = math.floor
 
 addon.frame = CreateFrame("Frame", "DuoCheckFrame", UIParent)
 addon.frame:RegisterEvent("ADDON_LOADED")
@@ -160,12 +164,17 @@ function addon:CreateProgressFrame()
     f.StrikeLines = {} -- For strikethrough effect
 
     local timeSinceLastUpdate = 0
+    local lastSecond = -1
     f:SetScript("OnUpdate", function(self, elapsed)
         timeSinceLastUpdate = timeSinceLastUpdate + elapsed
         if timeSinceLastUpdate >= 0.1 then
             if currentRun and not currentRun.done then
                 local duration = GetTime() - currentRun.startTime
-                self.Timer:SetText(date("!%H:%M:%S", duration))
+                local currentSecond = floor(duration)
+                if currentSecond ~= lastSecond then
+                    self.Timer:SetText(date("!%H:%M:%S", duration))
+                    lastSecond = currentSecond
+                end
             end
             timeSinceLastUpdate = 0
         end
@@ -378,27 +387,15 @@ function addon:StartRun(zoneID)
     -- Check for persisted run first
     if DuoCheckDungeonsDB.currentRun and DuoCheckDungeonsDB.currentRun.zoneID == zoneID and not DuoCheckDungeonsDB.currentRun.done then
         currentRun = DuoCheckDungeonsDB.currentRun
-        -- Fix time offset if needed? Using GetTime() which is session relative.
-        -- If session changed (reload), GetTime() resets. We need to handle that.
-        -- Actually, GetTime() resets on login. So 'startTime' from previous session is invalid.
-        -- We need to store 'startTime' as epoch time for persistence or calculate elapsed.
-        -- For simplicity, if we restore, we might reset the timer display or approximate it.
-        -- Let's adjust: currentRun.startTime needs to be relative to current GetTime().
-        -- We can store 'accumulatedTime' or 'startTimeEpoch'.
-        -- Let's update StartRun to use epoch for start time logic if we want real persistence across sessions.
-        -- But for reload, we can just assume user wants to continue.
-        -- To fix timer after reload:
-        -- Store 'startTime' as time() (epoch).
-        -- Then duration = time() - startTime.
-        -- But GetTime() is high precision for short durations.
-        -- Let's stick to simple reload logic: If persisted run exists, we use it, but fix startTime.
 
+        -- To ensure timer persistence across game sessions, we use 'startTimeEpoch'.
+        -- Upon restoration, we recalculate 'startTime' only if a significant drift or session reset is detected.
         if currentRun.startTimeEpoch then
-             -- Re-calculate local startTime relative to now
-             local elapsed = time() - currentRun.startTimeEpoch
-             currentRun.startTime = GetTime() - elapsed
+            local expectedStartTime = GetTime() - (time() - currentRun.startTimeEpoch)
+            if not currentRun.startTime or abs(currentRun.startTime - expectedStartTime) > 2 then
+                currentRun.startTime = expectedStartTime
+            end
         else
-            -- Legacy or fresh
             currentRun.startTime = GetTime()
             currentRun.startTimeEpoch = time()
         end
@@ -423,6 +420,7 @@ function addon:StartRun(zoneID)
     end
 
     addon:ShowProgressFrame()
+    addon:SaveRunState()
 end
 
 function addon:StopRun()
