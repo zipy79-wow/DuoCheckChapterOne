@@ -225,6 +225,7 @@ function addon:CreateProgressFrame()
         if timeSinceLastUpdate >= 1.0 then
             if currentRun and not currentRun.done then
                 local duration = GetTime() - currentRun.startTime
+                if duration < 0 then duration = 0 end
                 local currentSecond = floor(duration)
                 if currentSecond ~= lastSecond then
                     self.Timer:SetText(date("!%H:%M:%S", duration))
@@ -466,71 +467,16 @@ function addon:StartRun(zoneID)
     -- Check for persisted run first
     if DuoCheckDungeonsDB.currentRun and DuoCheckDungeonsDB.currentRun.zoneID == zoneID and not DuoCheckDungeonsDB.currentRun.done then
         currentRun = DuoCheckDungeonsDB.currentRun
-
-        -- To ensure timer persistence across game sessions, we use 'startTimeEpoch'.
-        -- Upon restoration, we recalculate 'startTime' only if a significant drift or session reset is detected.
+        -- Handle session persistence and timer drift
         if currentRun.startTimeEpoch then
-            local expectedStartTime = GetTime() - (time() - currentRun.startTimeEpoch)
-            if not currentRun.startTime or abs(currentRun.startTime - expectedStartTime) > 2 then
-                currentRun.startTime = expectedStartTime
+            local elapsedEpoch = time() - currentRun.startTimeEpoch
+            local sessionDuration = currentRun.startTime and (GetTime() - currentRun.startTime) or -1
+
+            if abs(sessionDuration - elapsedEpoch) > 2 then
+                currentRun.startTime = GetTime() - elapsedEpoch
             end
         else
-        -- Fix session-relative timer after reload/login
-        if currentRun.startTimeEpoch then
-             -- Re-calculate local startTime relative to now ONLY if GetTime() reset (session change)
-             local epochElapsed = time() - currentRun.startTimeEpoch
-             local sessionElapsed = GetTime() - currentRun.startTime
-
-             -- If drift is more than 2 seconds, assume session changed (reload vs login)
-             if math_abs(epochElapsed - sessionElapsed) > 2 then
-                currentRun.startTime = GetTime() - epochElapsed
-             end
-            local elapsed = time() - currentRun.startTimeEpoch
-            currentRun.startTime = GetTime() - elapsed
-        elseif currentRun.startTime then
-            -- Attempt to recover from legacy run without epoch
-            local now = GetTime()
-            if now < currentRun.startTime then
-                -- GetTime reset, we lost exact start but can set epoch to now for future reloads
-                currentRun.startTimeEpoch = time()
-                currentRun.startTime = now
-            else
-                -- GetTime didn't reset, we can calculate epoch accurately
-                currentRun.startTimeEpoch = time() - (now - currentRun.startTime)
-            end
-        -- Fix time offset from session reload.
-        -- GetTime() is session-relative and resets on login, making stored 'startTime' invalid.
-        -- We use 'startTimeEpoch' (Unix timestamp) to calculate total elapsed time, then
-        -- back-calculate a new local 'startTime' relative to the current session's GetTime().
-        if currentRun.startTimeEpoch then
-             -- Re-calculate local startTime relative to now ONLY if session reset or drift detected
-             local elapsedEpoch = time() - currentRun.startTimeEpoch
-             local elapsedSession = GetTime() - currentRun.startTime
-
-             -- If drift > 2 seconds or session reset (elapsedSession < 0), recalculate
-             if elapsedSession < 0 or abs(elapsedEpoch - elapsedSession) > 2 then
-                 currentRun.startTime = GetTime() - elapsedEpoch
-             end
-        else
-            -- Legacy restoration: missing startTimeEpoch
-            if GetTime() > currentRun.startTime then
-                -- Same session (UI Reload), extrapolate epoch
-                currentRun.startTimeEpoch = time() - (GetTime() - currentRun.startTime)
-            else
-                -- New session, must reset
-                currentRun.startTime = GetTime()
-                currentRun.startTimeEpoch = time()
-            end
-             local elapsed = time() - currentRun.startTimeEpoch
-             local expectedStartTime = GetTime() - elapsed
-
-             -- If GetTime() reset (login) or significant drift (>2s), fix it.
-             -- Otherwise preserve original startTime for sub-second precision.
-             if not currentRun.startTime or currentRun.startTime > GetTime() or abs(currentRun.startTime - expectedStartTime) > 2 then
-                 currentRun.startTime = expectedStartTime
-             end
-        else
-            -- Legacy or fresh fallback
+            -- Legacy: initialize epoch and session start
             currentRun.startTime = GetTime()
             currentRun.startTimeEpoch = time()
         end
