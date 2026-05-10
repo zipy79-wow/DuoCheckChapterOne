@@ -7,6 +7,7 @@ local ipairs = ipairs
 local time = time
 local GetTime = GetTime
 local date = date
+local math = math
 local math_abs = math.abs
 local math_floor = math.floor
 local math_abs = math.abs
@@ -187,12 +188,17 @@ function addon:CreateProgressFrame()
     f.StrikeLines = {} -- For strikethrough effect
 
     local timeSinceLastUpdate = 0
+    local lastSecond = -1
     f:SetScript("OnUpdate", function(self, elapsed)
         timeSinceLastUpdate = timeSinceLastUpdate + elapsed
         if timeSinceLastUpdate >= 0.1 then
             if currentRun and not currentRun.done then
                 local duration = GetTime() - currentRun.startTime
-                self.Timer:SetText(date("!%H:%M:%S", duration))
+                local seconds = math.floor(duration)
+                if seconds ~= lastSecond then
+                    self.Timer:SetText(date("!%H:%M:%S", duration))
+                    lastSecond = seconds
+                end
             end
             timeSinceLastUpdate = 0
         end
