@@ -7,6 +7,8 @@ local ipairs = ipairs
 local time = time
 local GetTime = GetTime
 local date = date
+local math_abs = math.abs
+local math_floor = math.floor
 local abs = math.abs
 local floor = math.floor
 local math = math
@@ -229,12 +231,17 @@ function addon:CreateProgressFrame()
     f.StrikeLines = {} -- For strikethrough effect
 
     local timeSinceLastUpdate = 0
+    f.lastSecond = -1
     local lastSecond = -1
     f:SetScript("OnUpdate", function(self, elapsed)
         timeSinceLastUpdate = timeSinceLastUpdate + elapsed
         if timeSinceLastUpdate >= 1.0 then
             if currentRun and not currentRun.done then
                 local duration = GetTime() - currentRun.startTime
+                local currentSecond = math_floor(duration)
+                if currentSecond ~= self.lastSecond then
+                    self.Timer:SetText(date("!%H:%M:%S", duration))
+                    self.lastSecond = currentSecond
                 local seconds = floor(duration)
                 local seconds = math.floor(duration)
                 if seconds ~= lastSecond then
@@ -480,6 +487,14 @@ function addon:StartRun(zoneID)
 
         -- Fix session-relative timer after reload/login
         if currentRun.startTimeEpoch then
+             -- Re-calculate local startTime relative to now ONLY if GetTime() reset (session change)
+             local epochElapsed = time() - currentRun.startTimeEpoch
+             local sessionElapsed = GetTime() - currentRun.startTime
+
+             -- If drift is more than 2 seconds, assume session changed (reload vs login)
+             if math_abs(epochElapsed - sessionElapsed) > 2 then
+                currentRun.startTime = GetTime() - epochElapsed
+             end
             local elapsed = time() - currentRun.startTimeEpoch
             currentRun.startTime = GetTime() - elapsed
         elseif currentRun.startTime then
